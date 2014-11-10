@@ -1,8 +1,8 @@
 {
-	"ImportPath": "github.com/jbenet/go-ctx-group",
+	"ImportPath": "github.com/jbenet/go-ctxgroup",
 	"GoVersion": "go1.3",
 	"Packages": [
-		"."
+		"./..."
 	],
 	"Deps": [
 		{
