@@ -12,6 +12,10 @@ import (
 // lifecycle of a process.
 type TeardownFunc func() error
 
+// ChildFunc is a function to register as a child. It will be automatically
+// tracked.
+type ChildFunc func(parent ContextGroup)
+
 var nilTeardownFunc = func() error { return nil }
 
 // ContextGroup is an interface for services able to be opened and closed.
@@ -63,14 +67,27 @@ type ContextGroup interface {
 	// be closed when this parent is closed, and waited upon to finish. It is
 	// the functional equivalent of the following:
 	//
+	//	parent.Children().Add(1) // add one more dependent child
 	//  go func(parent, child ContextGroup) {
-	//  	parent.Children().Add(1) // add one more dependent child
 	//  	<-parent.Closing()       // wait until parent is closing
 	//  	child.Close()            // signal child to close
 	//  	parent.Children().Done() // child signals it is done
 	//	}(a, b)
 	//
 	AddChildGroup(c ContextGroup)
+
+	// AddChildFunc registers a dependent ChildFund. The child will receive
+	// its parent ContextGroup, and can wait on its signals. Child references
+	// tracked automatically. It equivalent to the following:
+	//
+	//  go func(parent, child ContextGroup) {
+	//
+	//  	<-parent.Closing()       // wait until parent is closing
+	//  	child.Close()            // signal child to close
+	//  	parent.Children().Done() // child signals it is done
+	//	}(a, b)
+	//
+	AddChildFunc(c ChildFunc)
 
 	// Close is a method to call when you wish to stop this ContextGroup
 	Close() error
@@ -145,6 +162,14 @@ func (c *contextGroup) AddChildGroup(child ContextGroup) {
 	}(c, child)
 }
 
+func (c *contextGroup) AddChildFunc(child ChildFunc) {
+	c.children.Add(1)
+	go func(parent ContextGroup, child ChildFunc) {
+		child(parent)
+		parent.Children().Done() // child signals it is done
+	}(c, child)
+}
+
 // Close is the external close function. it's a wrapper around internalClose
 // that waits on Closed()
 func (c *contextGroup) Close() error {
@@ -183,4 +208,13 @@ func (c *contextGroup) closeOnContextDone() {
 	<-c.Context().Done() // wait until parent (context) is done.
 	c.internalClose()
 	c.Children().Done()
+}
+
+// WithTeardown constructs and returns a ContextGroup with
+// cf TeardownFunc (and context.Background)
+func WithTeardown(cf TeardownFunc) ContextGroup {
+	if cf == nil {
+		panic("nil TeardownFunc")
+	}
+	return NewContextGroup(context.Background(), cf)
 }
