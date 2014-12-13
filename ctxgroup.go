@@ -254,5 +254,7 @@ func WithParent(p ContextGroup) ContextGroup {
 	if p == nil {
 		panic("nil ContextGroup")
 	}
-	return newContextGroup(p.Context(), nil)
+	c := newContextGroup(p.Context(), nil)
+	p.AddChildGroup(c)
+	return c
 }
