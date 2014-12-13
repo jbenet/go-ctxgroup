@@ -54,6 +54,10 @@ type ContextGroup interface {
 	// Context is the context of this ContextGroup. It is "sort of" a parent.
 	Context() context.Context
 
+	// SetTeardown assigns the teardown function.
+	// It is called exactly _once_ when the ContextGroup is Closed.
+	SetTeardown(tf TeardownFunc)
+
 	// Children is a sync.Waitgroup for all children goroutines that should
 	// shut down completely before this service is said to be "closed".
 	// Follows the semantics of WaitGroup:
@@ -130,20 +134,25 @@ type contextGroup struct {
 // newContextGroup constructs and returns a ContextGroup. It will call
 // cf TeardownFunc before its Done() Wait signals fire.
 func newContextGroup(ctx context.Context, cf TeardownFunc) ContextGroup {
+	ctx, cancel := context.WithCancel(ctx)
+	c := &contextGroup{
+		ctx:    ctx,
+		cancel: cancel,
+		closed: make(chan struct{}),
+	}
+	c.SetTeardown(cf)
+
+	c.Children().Add(1) // initialize with 1. calling Close will decrement it.
+	go c.closeOnContextDone()
+	return c
+}
+
+// SetTeardown assigns the teardown function.
+func (c *contextGroup) SetTeardown(cf TeardownFunc) {
 	if cf == nil {
 		cf = nilTeardownFunc
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	c := &contextGroup{
-		ctx:          ctx,
-		cancel:       cancel,
-		teardownFunc: cf,
-		closed:       make(chan struct{}),
-	}
-
-	c.Children().Add(1) // we're a child goroutine, to be waited upon.
-	go c.closeOnContextDone()
-	return c
+	c.teardownFunc = cf
 }
 
 func (c *contextGroup) Context() context.Context {
@@ -238,4 +247,12 @@ func WithContextAndTeardown(ctx context.Context, cf TeardownFunc) ContextGroup {
 		panic("nil TeardownFunc")
 	}
 	return newContextGroup(ctx, cf)
+}
+
+// WithParent constructs and returns a ContextGroup with given parent
+func WithParent(p ContextGroup) ContextGroup {
+	if p == nil {
+		panic("nil ContextGroup")
+	}
+	return newContextGroup(p.Context(), nil)
 }
