@@ -258,3 +258,8 @@ func WithParent(p ContextGroup) ContextGroup {
 	p.AddChildGroup(c)
 	return c
 }
+
+// WithBackground returns a ContextGroup with context.Background()
+func WithBackground() ContextGroup {
+	return newContextGroup(context.Background(), nil)
+}
