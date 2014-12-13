@@ -61,6 +61,7 @@ type ContextGroup interface {
 	//  Children().Add(1) // add one more dependent child
 	//  Children().Done() // child signals it is done
 	//
+	// WARNING: this is deprecated and will go away soon.
 	Children() *sync.WaitGroup
 
 	// AddChildGroup registers a dependent ContextGroup child. The child will
@@ -126,9 +127,9 @@ type contextGroup struct {
 	closeErr error
 }
 
-// NewContextGroup constructs and returns a ContextGroup. It will call
+// newContextGroup constructs and returns a ContextGroup. It will call
 // cf TeardownFunc before its Done() Wait signals fire.
-func NewContextGroup(ctx context.Context, cf TeardownFunc) ContextGroup {
+func newContextGroup(ctx context.Context, cf TeardownFunc) ContextGroup {
 	if cf == nil {
 		cf = nilTeardownFunc
 	}
@@ -216,5 +217,25 @@ func WithTeardown(cf TeardownFunc) ContextGroup {
 	if cf == nil {
 		panic("nil TeardownFunc")
 	}
-	return NewContextGroup(context.Background(), cf)
+	return newContextGroup(context.Background(), cf)
+}
+
+// WithContext constructs and returns a ContextGroup with given context
+func WithContext(ctx context.Context) ContextGroup {
+	if ctx == nil {
+		panic("nil Context")
+	}
+	return newContextGroup(ctx, nil)
+}
+
+// WithContextAndTeardown constructs and returns a ContextGroup with
+// cf TeardownFunc (and context.Background)
+func WithContextAndTeardown(ctx context.Context, cf TeardownFunc) ContextGroup {
+	if ctx == nil {
+		panic("nil Context")
+	}
+	if cf == nil {
+		panic("nil TeardownFunc")
+	}
+	return newContextGroup(ctx, cf)
 }
