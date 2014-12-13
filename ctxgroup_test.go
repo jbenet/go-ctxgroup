@@ -2,6 +2,7 @@ package ctxgroup
 
 import (
 	"testing"
+	"time"
 
 	context "github.com/jbenet/go-ctxgroup/Godeps/_workspace/src/code.google.com/p/go.net/context"
 )
@@ -28,6 +29,81 @@ func setupCGHierarchy(ctx context.Context) tree {
 	c4 := WithParent(b2)
 
 	return t(a, t(b1, t(c1), t(c2)), t(b2, t(c3), t(c4)))
+}
+
+func TestClosingClosed(t *testing.T) {
+
+	a := WithBackground()
+	Q := make(chan string)
+
+	go func() {
+		<-a.Closing()
+		Q <- "closing"
+	}()
+
+	go func() {
+		<-a.Closed()
+		Q <- "closed"
+	}()
+
+	go func() {
+		a.Close()
+		Q <- "closed"
+	}()
+
+	if q := <-Q; q != "closing" {
+		t.Error("order incorrect. closing not first")
+	}
+	if q := <-Q; q != "closed" {
+		t.Error("order incorrect. closing not first")
+	}
+	if q := <-Q; q != "closed" {
+		t.Error("order incorrect. closing not first")
+	}
+}
+
+func TestChildFunc(t *testing.T) {
+	a := WithBackground()
+
+	wait1 := make(chan struct{})
+	wait2 := make(chan struct{})
+	wait3 := make(chan struct{})
+	wait4 := make(chan struct{})
+	go func() {
+		a.Close()
+		wait4 <- struct{}{}
+	}()
+
+	a.AddChildFunc(func(parent ContextGroup) {
+		wait1 <- struct{}{}
+		<-wait2
+		wait3 <- struct{}{}
+	})
+
+	<-wait1
+	select {
+	case <-wait3:
+		t.Error("should not be closed yet")
+	case <-wait4:
+		t.Error("should not be closed yet")
+	case <-a.Closed():
+		t.Error("should not be closed yet")
+	default:
+	}
+
+	wait2 <- struct{}{}
+
+	select {
+	case <-wait3:
+	case <-time.After(time.Second):
+		t.Error("should be closed now")
+	}
+
+	select {
+	case <-wait4:
+	case <-time.After(time.Second):
+		t.Error("should be closed now")
+	}
 }
 
 func TestTeardownCalledOnce(t *testing.T) {
