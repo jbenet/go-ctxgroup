@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	context "github.com/jbenet/go-ctxgroup/Godeps/_workspace/src/code.google.com/p/go.net/context"
+	context "github.com/jbenet/go-ctxgroup/Godeps/_workspace/src/golang.org/x/net/context"
 )
 
 // TeardownFunc is a function used to cleanup state at the end of the
