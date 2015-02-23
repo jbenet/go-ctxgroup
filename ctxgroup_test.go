@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	context "github.com/jbenet/go-ctxgroup/Godeps/_workspace/src/code.google.com/p/go.net/context"
+	context "github.com/jbenet/go-ctxgroup/Godeps/_workspace/src/golang.org/x/net/context"
 )
 
 type tree struct {
